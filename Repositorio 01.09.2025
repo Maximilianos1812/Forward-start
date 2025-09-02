@@ -1,0 +1,47 @@
+import math
+
+# Función de distribución acumulada normal estándar
+def N(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+class ForwardStartOption:
+    def __init__(self, S0, q, t_start, T, alpha, sigma):
+        """
+        S0      : Spot hoy
+        q       : tasa de dividendos continua (o tasa extranjera en FX)
+        t_start : tiempo (años) hasta que arranca la opción
+        T       : vencimiento total (años)
+        alpha   : factor de strike (ej: 1 = ATM-forward)
+        sigma   : volatilidad forward entre t_start y T
+        """
+        self.S0 = S0
+        self.q = q
+        self.t_start = t_start
+        self.T = T
+        self.alpha = alpha
+        self.sigma = sigma
+
+    def _params(self):
+        tau = self.T - self.t_start
+        if tau <= 0:
+            raise ValueError("T debe ser mayor que t_start.")
+        d1 = (-math.log(self.alpha) + 0.5 * self.sigma**2 * tau) / (self.sigma * math.sqrt(tau))
+        d2 = d1 - self.sigma * math.sqrt(tau)
+        return tau, d1, d2
+
+    def call_price(self):
+        tau, d1, d2 = self._params()
+        return self.S0 * math.exp(-self.q * self.t_start) * (N(d1) - self.alpha * N(d2))
+
+    def put_price(self):
+        tau, d1, d2 = self._params()
+        return self.S0 * math.exp(-self.q * self.t_start) * (self.alpha * N(-d2) - N(-d1))
+
+    def delta(self, option_type="call"):
+        """Delta en t=0 (opcional: call o put)"""
+        if option_type == "call":
+            return self.call_price() / self.S0
+        elif option_type == "put":
+            return self.put_price() / self.S0
+        else:
+            raise ValueError("option_type debe ser 'call' o 'put'.")
