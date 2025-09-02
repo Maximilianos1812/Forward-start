@@ -1,19 +1,18 @@
 import math
+import numpy as np
+import matplotlib.pyplot as plt
 
-# Función de distribución acumulada normal estándar
+# -------------------------
+# Función normal acumulada
+# -------------------------
 def N(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
+# -------------------------
+# Clase Forward Start Option
+# -------------------------
 class ForwardStartOption:
     def __init__(self, S0, q, t_start, T, alpha, sigma):
-        """
-        S0      : Spot hoy
-        q       : tasa de dividendos continua (o tasa extranjera en FX)
-        t_start : tiempo (años) hasta que arranca la opción
-        T       : vencimiento total (años)
-        alpha   : factor de strike (ej: 1 = ATM-forward)
-        sigma   : volatilidad forward entre t_start y T
-        """
         self.S0 = S0
         self.q = q
         self.t_start = t_start
@@ -38,10 +37,61 @@ class ForwardStartOption:
         return self.S0 * math.exp(-self.q * self.t_start) * (self.alpha * N(-d2) - N(-d1))
 
     def delta(self, option_type="call"):
-        """Delta en t=0 (opcional: call o put)"""
         if option_type == "call":
             return self.call_price() / self.S0
         elif option_type == "put":
             return self.put_price() / self.S0
         else:
             raise ValueError("option_type debe ser 'call' o 'put'.")
+
+    # -------------------------
+    # Perfil de pago en T
+    # -------------------------
+    def payoff_call(self, ST, S_start):
+        K = self.alpha * S_start
+        return np.maximum(ST - K, 0.0)
+
+    def payoff_put(self, ST, S_start):
+        K = self.alpha * S_start
+        return np.maximum(K - ST, 0.0)
+
+# -------------------------
+# Ejemplo con gráficos
+# -------------------------
+if __name__ == "__main__":
+    # Parámetros
+    S0 = 100
+    q = 0.02
+    t_start = 1.0
+    T = 2.0
+    alpha = 1.0
+    sigma = 0.25
+
+    fwd_opt = ForwardStartOption(S0, q, t_start, T, alpha, sigma)
+
+    # Precio del activo en t_start (supongamos un valor esperado)
+    S_start = S0 * math.exp(-q * t_start)  # simplificado: crecimiento ajustado por dividendos
+
+    # Rango de precios posibles al vencimiento T
+    ST = np.linspace(50, 150, 200)
+
+    # Payoffs
+    call_payoff = fwd_opt.payoff_call(ST, S_start)
+    put_payoff = fwd_opt.payoff_put(ST, S_start)
+
+    # Graficar
+    plt.figure(figsize=(10,6))
+    plt.plot(ST, call_payoff, label="Call Forward Start", color="blue")
+    plt.plot(ST, put_payoff, label="Put Forward Start", color="red")
+    plt.axhline(0, color="black", linewidth=0.8)
+    plt.axvline(S_start, linestyle="--", color="gray", label=f"Strike = {round(S_start,2)}")
+    plt.title("Perfiles de Pago - Forward Start Option")
+    plt.xlabel("Precio del subyacente en T (ST)")
+    plt.ylabel("Payoff")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.show()
+
+    # Imprimir precios teóricos
+    print("Precio teórico CALL:", round(fwd_opt.call_price(), 4))
+    print("Precio teórico PUT :", round(fwd_opt.put_price(), 4))
